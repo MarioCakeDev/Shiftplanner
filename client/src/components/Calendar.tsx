@@ -31,7 +31,11 @@ export function Calendar({ month, onMonthChange, shifts, armedTemplateId, templa
   const [selDates, setSelDates] = useState<Set<string>>(new Set());
   const [dragPreview, setDragPreview] = useState<DragPreview | null>(null);
   const [touchAnchor, setTouchAnchor] = useState<string | null>(null);
+  const [touchDragging, setTouchDragging] = useState(false);
   const dragStartRef = useRef<string | null>(null);
+  const dragEndRef = useRef<string | null>(null);
+  const touchStartPointRef = useRef<{ x: number; y: number } | null>(null);
+  const touchEndDateRef = useRef<string | null>(null);
 
   const days = eachDayOfInterval({
     start: startOfWeek(startOfMonth(currentDate), { weekStartsOn: 1 }),
@@ -56,6 +60,7 @@ export function Calendar({ month, onMonthChange, shifts, armedTemplateId, templa
 
   const handleMouseDown = useCallback((dateStr: string) => {
     dragStartRef.current = dateStr;
+    dragEndRef.current = dateStr;
     setSelDates(new Set([dateStr]));
     const template = getArmedTemplate();
     const existingShift = getShiftForDate(dateStr);
@@ -65,29 +70,31 @@ export function Calendar({ month, onMonthChange, shifts, armedTemplateId, templa
 
   const handleMouseUp = useCallback((dateStr: string) => {
     const start = dragStartRef.current;
+    const end = dragEndRef.current ?? dateStr;
     dragStartRef.current = null;
+    dragEndRef.current = null;
     setSelDates(new Set());
     setDragPreview(null);
 
     if (!start) return;
 
-    if (start === dateStr) {
+    if (start === end) {
       const template = getArmedTemplate();
-      const existingShift = getShiftForDate(dateStr);
+      const existingShift = getShiftForDate(end);
 
       if (template) {
         if (existingShift) {
-          onBatch({ mode: existingShift.templateId === template.id ? "REMOVE" : "SET", templateId: template.id, dates: [dateStr] });
+          onBatch({ mode: existingShift.templateId === template.id ? "REMOVE" : "SET", templateId: template.id, dates: [end] });
         } else {
-          onBatch({ mode: "SET", templateId: template.id, dates: [dateStr] });
+          onBatch({ mode: "SET", templateId: template.id, dates: [end] });
         }
       } else if (existingShift) {
         setEditingShift(existingShift);
       } else {
-        onSelectShift([dateStr]);
+        onSelectShift([end]);
       }
     } else {
-      const [dStart, dEnd] = start < dateStr ? [start, dateStr] : [dateStr, start];
+      const [dStart, dEnd] = start < end ? [start, end] : [end, start];
       const dates = eachDayOfInterval({ start: parseISO(dStart), end: parseISO(dEnd) }).map((d) => format(d, "yyyy-MM-dd"));
 
       if (getArmedTemplate()) {
@@ -101,6 +108,7 @@ export function Calendar({ month, onMonthChange, shifts, armedTemplateId, templa
   const updateSelection = useCallback((dateStr: string) => {
     const start = dragStartRef.current;
     if (!start) return;
+    dragEndRef.current = dateStr;
     const [dStart, dEnd] = start < dateStr ? [start, dateStr] : [dateStr, start];
     const newDates = new Set(eachDayOfInterval({ start: parseISO(dStart), end: parseISO(dEnd) }).map((d) => format(d, "yyyy-MM-dd")));
     setSelDates(newDates);
@@ -113,7 +121,10 @@ export function Calendar({ month, onMonthChange, shifts, armedTemplateId, templa
 
   const handleTouchStart = useCallback((dateStr: string) => {
     setTouchAnchor(dateStr);
+    setTouchDragging(false);
     dragStartRef.current = dateStr;
+    touchStartPointRef.current = null;
+    touchEndDateRef.current = dateStr;
     const template = getArmedTemplate();
     const existingShift = getShiftForDate(dateStr);
     const mode = existingShift?.templateId === armedTemplateId ? "REMOVE" : "SET";
@@ -122,8 +133,12 @@ export function Calendar({ month, onMonthChange, shifts, armedTemplateId, templa
 
   const handleTouchMove = useCallback((dateStr: string) => {
     if (!touchAnchor || !dragStartRef.current) return;
+
+    touchEndDateRef.current = dateStr;
+
     setSelDates(prev => {
       const start = dragStartRef.current!;
+      dragEndRef.current = dateStr;
       const [dStart, dEnd] = start < dateStr ? [start, dateStr] : [dateStr, start];
       const newDates = new Set(eachDayOfInterval({ start: parseISO(dStart), end: parseISO(dEnd) }).map((d) => format(d, "yyyy-MM-dd")));
       setDragPreview(p => p ? { ...p, dates: newDates } : null);
@@ -133,14 +148,19 @@ export function Calendar({ month, onMonthChange, shifts, armedTemplateId, templa
 
   const handleTouchEnd = useCallback(async (dateStr: string) => {
     const start = touchAnchor;
+    const end = touchEndDateRef.current ?? dragEndRef.current ?? dateStr;
     setTouchAnchor(null);
+    setTouchDragging(false);
+    touchStartPointRef.current = null;
+    touchEndDateRef.current = null;
+    dragEndRef.current = null;
     setDragPreview(null);
     if (!start) return;
 
-    if (start === dateStr) {
-      handleMouseUp(dateStr);
+    if (start === end) {
+      handleMouseUp(end);
     } else {
-      const [dStart, dEnd] = start < dateStr ? [start, dateStr] : [dateStr, start];
+      const [dStart, dEnd] = start < end ? [start, end] : [end, start];
       const dates = eachDayOfInterval({ start: parseISO(dStart), end: parseISO(dEnd) }).map((d) => format(d, "yyyy-MM-dd"));
 
       if (getArmedTemplate()) {
@@ -151,6 +171,7 @@ export function Calendar({ month, onMonthChange, shifts, armedTemplateId, templa
     }
     setTouchAnchor(null);
     dragStartRef.current = null;
+    dragEndRef.current = null;
     setSelDates(new Set());
   }, [touchAnchor, applyBatch, handleMouseUp, getArmedTemplate, onSelectShift]);
 

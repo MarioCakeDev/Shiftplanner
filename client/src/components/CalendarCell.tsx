@@ -31,20 +31,18 @@ export function CalendarCell({
       className={`relative min-h-[80px] border border-gray-200 p-1 select-none transition-colors ${
         !isCurrentMonth ? "bg-gray-50" : "bg-white"
       } ${isToday ? "ring-2 ring-blue-400 ring-inset" : ""} ${isSelected ? "bg-blue-100" : ""}`}
+      style={{ touchAction: "manipulation" }}
       onMouseDown={(e) => { e.preventDefault(); onMouseDown(dateStr); }}
       onMouseMove={() => onMouseMove(dateStr)}
       onMouseUp={() => onMouseUp(dateStr)}
-      onTouchStart={(e) => { e.preventDefault(); onTouchStart(dateStr); }}
+      onTouchStart={() => { onTouchStart(dateStr); }}
       onTouchMove={(e) => {
-        e.preventDefault();
         const touch = e.touches[0];
         const el = document.elementFromPoint(touch.clientX, touch.clientY);
-        if (el) {
-          const cell = el.closest("[data-date]");
-          if (cell) { const d = cell.getAttribute("data-date"); if (d) onTouchMove(d); }
-        }
+        const d = el?.closest("[data-date]")?.getAttribute("data-date");
+        if (d) onTouchMove(d);
       }}
-      onTouchEnd={(e) => { e.preventDefault(); onTouchEnd(dateStr); }}
+      onTouchEnd={() => { onTouchEnd(dateStr); }}
       data-date={dateStr}
     >
       <span className={`text-xs font-medium ${isCurrentMonth ? "text-gray-700" : "text-gray-300"}`}>{day}</span>
