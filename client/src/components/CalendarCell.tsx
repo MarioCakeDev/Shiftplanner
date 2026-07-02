@@ -31,7 +31,7 @@ export function CalendarCell({
       className={`relative min-h-[80px] border border-gray-200 p-1 select-none transition-colors ${
         !isCurrentMonth ? "bg-gray-50" : "bg-white"
       } ${isToday ? "ring-2 ring-blue-400 ring-inset" : ""} ${isSelected ? "bg-blue-100" : ""}`}
-      style={{ touchAction: "manipulation" }}
+      style={{ touchAction: "none" }}
       onMouseDown={(e) => { e.preventDefault(); onMouseDown(dateStr); }}
       onMouseMove={() => onMouseMove(dateStr)}
       onMouseUp={() => onMouseUp(dateStr)}
