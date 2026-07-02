@@ -19,7 +19,7 @@ export const oidcAuthConfig = {
   OIDC_ISSUER: config.oidc.issuer,
   OIDC_CLIENT_ID: config.oidc.clientId,
   OIDC_CLIENT_SECRET: config.oidc.clientSecret,
-  OIDC_REDIRECT_URI: config.oidc.redirectUri,
+  OIDC_REDIRECT_URI: "/api/auth/callback",
   OIDC_AUTH_EXTERNAL_URL: process.env.OIDC_AUTH_EXTERNAL_URL,
   OIDC_COOKIE_DOMAIN: process.env.OIDC_COOKIE_DOMAIN,
   OIDC_COOKIE_PATH: "/",
@@ -30,8 +30,10 @@ export const oidcAuthConfig = {
   OIDC_JWT_ALG: "HS256" as const,
 };
 
+export const oidcMiddleware = initOidcAuthMiddleware(oidcAuthConfig);
+
 export const authRoutes = new Hono()
-  .get("/login", (c) => c.redirect("/"))
+  .use("*", oidcMiddleware)
   .get("/callback", async (c) => processOAuthCallback(c))
   .get("/logout", async (c) => {
     await revokeSession(c);
@@ -47,8 +49,6 @@ export const authRoutes = new Hono()
       icalUrl: "",
     });
   });
-
-export const oidcMiddleware = initOidcAuthMiddleware(oidcAuthConfig);
 
 export function hasOidcConfig() {
   return !!(config.oidc.issuer && config.oidc.clientId && config.oidc.clientSecret);
