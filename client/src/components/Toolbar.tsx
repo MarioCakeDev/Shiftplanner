@@ -29,6 +29,12 @@ export function Toolbar({ templates, armedTemplateId, onArm, onCreateTemplate, o
     setShowForm(true);
   };
 
+  const beginCreate = () => {
+    setEditingTemplateId(null);
+    resetForm();
+    setShowForm(true);
+  };
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingTemplate) {
@@ -58,7 +64,10 @@ export function Toolbar({ templates, armedTemplateId, onArm, onCreateTemplate, o
         {templates.map((t) => (
           <div key={t.id} className="relative group">
             <button
-              onClick={() => onArm(armedTemplateId === t.id ? null : t.id)}
+              onClick={() => {
+                onArm(armedTemplateId === t.id ? null : t.id);
+                if (armedTemplateId !== t.id) beginEdit(t);
+              }}
               className={`px-3 py-1.5 rounded text-sm font-medium border-2 transition-all cursor-pointer ${
                 armedTemplateId === t.id ? "border-gray-900 ring-2 ring-gray-900" : "border-transparent hover:border-gray-300"
               }`}
@@ -67,38 +76,22 @@ export function Toolbar({ templates, armedTemplateId, onArm, onCreateTemplate, o
               {t.title}
               <span className="ml-1.5 text-xs opacity-60">{t.startTime}-{t.endTime}</span>
             </button>
-            <button
-              onClick={() => beginEdit(t)}
-              className="absolute -top-1.5 -left-1.5 w-4 h-4 bg-blue-500 text-white rounded-full text-[10px] opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer leading-none"
-              title="Edit shift"
-            >
-              ✎
-            </button>
-            <button
-              onClick={() => {
-                if (confirm(`Delete ${t.title}? This will remove all shifts using this configuration.`)) {
-                  onDeleteTemplate(t.id);
-                }
-              }}
-              className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white rounded-full text-xs opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer leading-none"
-            >
-              ×
-            </button>
           </div>
         ))}
 
         <button
           onClick={() => {
-            if (showForm) {
+            if (showForm && !editingTemplate) {
               setShowForm(false);
               resetForm();
             } else {
-              setShowForm(true);
+              beginCreate();
+              onArm(null);
             }
           }}
           className="px-3 py-1.5 rounded text-sm font-medium text-gray-500 border border-dashed border-gray-300 hover:border-gray-400 hover:text-gray-700 cursor-pointer"
         >
-          {editingTemplate ? "Edit Shift" : "+ Add Shift"}
+          + Add Shift
         </button>
 
         {armedTemplateId && (
@@ -123,6 +116,22 @@ export function Toolbar({ templates, armedTemplateId, onArm, onCreateTemplate, o
           <button type="submit" className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 cursor-pointer">Save</button>
           <button type="button" onClick={() => { setShowForm(false); resetForm(); }}
             className="px-3 py-1 text-gray-500 text-sm hover:text-gray-700 cursor-pointer">Cancel</button>
+          {editingTemplate && (
+            <button
+              type="button"
+              onClick={() => {
+                if (confirm(`Delete ${editingTemplate.title}? This will remove all shifts using this configuration.`)) {
+                  onDeleteTemplate(editingTemplate.id);
+                  setShowForm(false);
+                  resetForm();
+                  onArm(null);
+                }
+              }}
+              className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700 cursor-pointer"
+            >
+              Delete
+            </button>
+          )}
         </form>
       )}
     </div>
