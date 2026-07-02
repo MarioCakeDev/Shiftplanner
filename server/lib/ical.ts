@@ -7,6 +7,8 @@ import { join } from "path";
 const cacheDir = join(import.meta.dir, "../../data/ical-cache");
 mkdirSync(cacheDir, { recursive: true });
 
+const TIMEZONE = process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone;
+
 export function invalidateIcalCache(userId: string) {
   const filePath = join(cacheDir, `${userId}.ics`);
   if (existsSync(filePath)) {
@@ -43,6 +45,7 @@ export function generateIcal(userId: string): string {
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
     `X-WR-CALNAME:Schichtplan ${escapeIcalText(user.name)}`,
+    `X-WR-TIMEZONE:${TIMEZONE}`,
   ];
 
   for (const shift of userShifts) {
@@ -51,8 +54,8 @@ export function generateIcal(userId: string): string {
     lines.push(
       "BEGIN:VEVENT",
       `UID:${shift.id}@schichtplan`,
-      `DTSTART:${start}`,
-      `DTEND:${end}`,
+      `DTSTART;TZID=${TIMEZONE}:${start}`,
+      `DTEND;TZID=${TIMEZONE}:${end}`,
       `SUMMARY:${escapeIcalText(shift.title)}`,
       `DESCRIPTION:${escapeIcalText(shift.title)}`,
       `DTSTAMP:${now}`,
