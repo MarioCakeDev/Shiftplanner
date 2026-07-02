@@ -1,6 +1,7 @@
 import { db } from "../db";
 import { shifts, users } from "../db/schema";
 import { eq } from "drizzle-orm";
+import ical, { ICalCalendarMethod, ICalEventTransparency } from "ical-generator";
 import { fromZonedTime } from "date-fns-tz";
 import { mkdirSync, existsSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
@@ -17,13 +18,9 @@ export function invalidateIcalCache(userId: string) {
   }
 }
 
-function formatIcalDate(iso: string): string {
+function formatIcalDate(iso: string): Date {
   const padded = iso.length === 16 ? `${iso}:00` : iso;
-  return fromZonedTime(padded.replace(/Z$/i, ""), TIMEZONE).toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
-}
-
-function escapeIcalText(text: string): string {
-  return text.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
+  return fromZonedTime(padded.replace(/Z$/i, ""), TIMEZONE);
 }
 
 export function generateIcal(userId: string): string {
@@ -38,34 +35,23 @@ export function generateIcal(userId: string): string {
 
   const userShifts = db.select().from(shifts).where(eq(shifts.userId, userId)).all();
 
-  const now = formatIcalDate(new Date().toISOString().split(".")[0] + "Z");
-  const lines: string[] = [
-    "BEGIN:VCALENDAR",
-    "VERSION:2.0",
-    "PRODID:-//Schichtplan//schichtplan//EN",
-    "CALSCALE:GREGORIAN",
-    "METHOD:PUBLISH",
-    `X-WR-CALNAME:Schichtplan ${escapeIcalText(user.name)}`,
-  ];
+  const calendar = ical();
+  calendar.name(`Schichtplan ${user.name}`);
+  calendar.prodId({ company: "Schichtplan", product: "schichtplan", language: "EN" });
+  calendar.method(ICalCalendarMethod.PUBLISH);
 
   for (const shift of userShifts) {
     const start = formatIcalDate(shift.startDateTime);
     const end = formatIcalDate(shift.endDateTime);
-    lines.push(
-      "BEGIN:VEVENT",
-      `UID:${shift.id}@schichtplan`,
-      `DTSTART:${start}`,
-      `DTEND:${end}`,
-      `SUMMARY:${escapeIcalText(shift.title)}`,
-      `DESCRIPTION:${escapeIcalText(shift.title)}`,
-      `DTSTAMP:${now}`,
-      "TRANSP:TRANSPARENT",
-      "END:VEVENT",
-    );
+    calendar.createEvent({ start, end, summary: shift.title })
+      .uid(shift.id)
+      .summary(shift.title)
+      .description(shift.title)
+      .timestamp(new Date())
+      .transparency(ICalEventTransparency.TRANSPARENT);
   }
 
-  lines.push("END:VCALENDAR");
-  const icsContent = lines.join("\r\n") + "\r\n";
+  const icsContent = calendar.toString();
 
   writeFileSync(cachePath, icsContent, "utf-8");
   return icsContent;
