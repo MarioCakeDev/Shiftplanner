@@ -66,6 +66,18 @@ export default function App() {
             >
               Copy iCal URL
             </button>
+            <button
+              onClick={() => (window.location.href = "/api/auth/login")}
+              className="ml-3 text-blue-600 hover:text-blue-800 underline cursor-pointer"
+            >
+              Login
+            </button>
+            <button
+              onClick={() => (window.location.href = "/api/auth/logout")}
+              className="ml-3 text-blue-600 hover:text-blue-800 underline cursor-pointer"
+            >
+              Logout
+            </button>
           </div>
         )}
       </header>

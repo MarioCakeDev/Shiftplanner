@@ -1,6 +1,7 @@
 export const config = {
   port: parseInt(process.env.PORT || "3000"),
   databaseUrl: process.env.DATABASE_URL || "data/schichtplan.db",
+  cookieSecure: process.env.COOKIE_SECURE === "true" || process.env.NODE_ENV === "production",
   oidc: {
     issuer: process.env.OIDC_ISSUER || "",
     clientId: process.env.OIDC_CLIENT_ID || "",

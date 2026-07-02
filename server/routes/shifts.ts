@@ -118,8 +118,10 @@ const app = new Hono<{ Variables: { user: AuthUser } }>()
   .delete("/:id", (c) => {
     const user = c.get("user");
     const id = c.req.param("id");
-    const result = db.delete(shifts).where(and(eq(shifts.id, id), eq(shifts.userId, user.id))).run();
-    if (result.changes === 0) return c.json({ error: "not found" } satisfies ErrorResponse, 404);
+    const existing = db.select().from(shifts).where(and(eq(shifts.id, id), eq(shifts.userId, user.id))).get();
+    if (!existing) return c.json({ error: "not found" } satisfies ErrorResponse, 404);
+
+    db.delete(shifts).where(and(eq(shifts.id, id), eq(shifts.userId, user.id))).run();
     invalidateIcalCache(user.id);
     return c.body(null, 204);
   })
@@ -133,10 +135,14 @@ const app = new Hono<{ Variables: { user: AuthUser } }>()
     }
     if (Object.keys(updateData).length === 0) return c.json({ error: "no fields to update" } satisfies ErrorResponse, 400);
     updateData.updatedAt = new Date().toISOString();
-    const result = db.update(shifts).set(updateData).where(
+    const existing = db.select().from(shifts).where(
+      and(eq(shifts.id, id), eq(shifts.userId, user.id))
+    ).get();
+    if (!existing) return c.json({ error: "not found" } satisfies ErrorResponse, 404);
+
+    db.update(shifts).set(updateData).where(
       and(eq(shifts.id, id), eq(shifts.userId, user.id))
     ).run();
-    if (result.changes === 0) return c.json({ error: "not found" } satisfies ErrorResponse, 404);
     invalidateIcalCache(user.id);
     return c.json({ id, ...updateData } as unknown as Shift);
   });

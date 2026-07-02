@@ -42,17 +42,22 @@ const app = new Hono<{ Variables: { user: AuthUser } }>()
     const user = c.get("user");
     const body = c.req.valid("json") as CreateTemplateInput;
     const id = randomUUID();
-    db.insert(shiftTemplates).values({ ...body, id, userId: user.id }).run();
-    return c.json({ id, ...body } satisfies ShiftTemplate, 201);
+    const createdAt = new Date().toISOString();
+    db.insert(shiftTemplates).values({ ...body, id, userId: user.id, createdAt }).run();
+    return c.json({ id, userId: user.id, createdAt, ...body } satisfies ShiftTemplate, 201);
   })
   .put("/:id", zValidator("json", createSchema), (c) => {
     const user = c.get("user");
     const id = c.req.param("id");
     const body = c.req.valid("json") as CreateTemplateInput;
-    const result = db.update(shiftTemplates).set(body).where(
+    const existing = db.select().from(shiftTemplates).where(
+      and(eq(shiftTemplates.id, id), eq(shiftTemplates.userId, user.id))
+    ).get();
+    if (!existing) return c.json({ error: "not found" } satisfies ErrorResponse, 404);
+
+    db.update(shiftTemplates).set(body).where(
       and(eq(shiftTemplates.id, id), eq(shiftTemplates.userId, user.id))
     ).run();
-    if (result.changes === 0) return c.json({ error: "not found" } satisfies ErrorResponse, 404);
 
     const affectedShifts = db.select().from(shifts).where(
       and(eq(shifts.userId, user.id), eq(shifts.templateId, id))
@@ -70,16 +75,20 @@ const app = new Hono<{ Variables: { user: AuthUser } }>()
     }
 
     invalidateIcalCache(user.id);
-    return c.json({ id, ...body } satisfies ShiftTemplate);
+    return c.json({ ...existing, ...body } satisfies ShiftTemplate);
   })
   .delete("/:id", (c) => {
     const user = c.get("user");
     const id = c.req.param("id");
+    const existing = db.select().from(shiftTemplates).where(
+      and(eq(shiftTemplates.id, id), eq(shiftTemplates.userId, user.id))
+    ).get();
+    if (!existing) return c.json({ error: "not found" } satisfies ErrorResponse, 404);
+
     db.delete(shifts).where(and(eq(shifts.userId, user.id), eq(shifts.templateId, id))).run();
-    const result = db.delete(shiftTemplates).where(
+    db.delete(shiftTemplates).where(
       and(eq(shiftTemplates.id, id), eq(shiftTemplates.userId, user.id))
     ).run();
-    if (result.changes === 0) return c.json({ error: "not found" } satisfies ErrorResponse, 404);
     invalidateIcalCache(user.id);
     return c.body(null, 204);
   });

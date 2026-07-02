@@ -1,11 +1,6 @@
-import { createMiddleware } from "hono/factory";
-import type { Context, Next } from "hono";
+import { Hono } from "hono";
+import { initOidcAuthMiddleware, processOAuthCallback, revokeSession, getAuth } from "@hono/oidc-auth";
 import { config } from "../lib/config";
-import { db } from "../db";
-import { users } from "../db/schema";
-import { eq } from "drizzle-orm";
-import { createRemoteJWKSet, jwtVerify } from "jose";
-import { randomUUID } from "crypto";
 
 export type AuthUser = {
   id: string;
@@ -19,44 +14,42 @@ declare module "hono" {
   }
 }
 
-export const authMiddleware = createMiddleware(async (c: Context, next: Next) => {
-  if (!config.authEnabled) {
-    c.set("user", { id: "dev-user", name: "Dev User", email: "dev@localhost" });
-    await next();
-    return;
-  }
+export const oidcAuthConfig = {
+  OIDC_AUTH_SECRET: process.env.OIDC_AUTH_SECRET || "dev-secret-change-this-in-production-dev-secret-change-this-in-production",
+  OIDC_ISSUER: config.oidc.issuer,
+  OIDC_CLIENT_ID: config.oidc.clientId,
+  OIDC_CLIENT_SECRET: config.oidc.clientSecret,
+  OIDC_REDIRECT_URI: config.oidc.redirectUri,
+  OIDC_AUTH_EXTERNAL_URL: process.env.OIDC_AUTH_EXTERNAL_URL,
+  OIDC_COOKIE_DOMAIN: process.env.OIDC_COOKIE_DOMAIN,
+  OIDC_COOKIE_PATH: "/",
+  OIDC_SCOPES: "openid profile email",
+  OIDC_AUTH_EXPIRES: process.env.OIDC_AUTH_EXPIRES,
+  OIDC_AUTH_REFRESH_INTERVAL: process.env.OIDC_AUTH_REFRESH_INTERVAL,
+  OIDC_AUDIENCE: process.env.OIDC_AUDIENCE,
+  OIDC_JWT_ALG: "HS256" as const,
+};
 
-  const authHeader = c.req.header("Authorization");
-  if (!authHeader?.startsWith("Bearer ")) {
-    return c.json({ error: "unauthorized" }, 401);
-  }
-
-  const token = authHeader.slice(7);
-  try {
-    const JWKS = createRemoteJWKSet(new URL(`${config.oidc.issuer}/.well-known/jwks.json`));
-    const { payload } = await jwtVerify(token, JWKS, {
-      issuer: config.oidc.issuer,
+export const authRoutes = new Hono()
+  .get("/login", (c) => c.redirect("/api/auth/callback"))
+  .get("/callback", async (c) => processOAuthCallback(c))
+  .get("/logout", async (c) => {
+    await revokeSession(c);
+    return c.redirect("/");
+  })
+  .get("/me", async (c) => {
+    const auth = await getAuth(c);
+    if (!auth) return c.json({ error: "unauthorized" }, 401);
+    return c.json({
+      id: auth.sub || "",
+      name: (auth.name as string) || "Unknown",
+      email: (auth.email as string) || "",
+      icalUrl: "",
     });
+  });
 
-    const sub = payload.sub as string;
-    const name = (payload.name || payload.preferred_username || "Unknown") as string;
-    const email = (payload.email || "") as string;
+export const oidcMiddleware = initOidcAuthMiddleware(oidcAuthConfig);
 
-    let user = db.select().from(users).where(eq(users.id, sub)).get();
-    if (!user) {
-      const newUser = {
-        id: sub,
-        name,
-        email,
-        icalToken: randomUUID(),
-      };
-      db.insert(users).values(newUser).run();
-      user = newUser as typeof users.$inferSelect;
-    }
-
-    c.set("user", { id: user.id, name: user.name, email: user.email });
-    await next();
-  } catch {
-    return c.json({ error: "invalid token" }, 401);
-  }
-});
+export function hasOidcConfig() {
+  return !!(config.oidc.issuer && config.oidc.clientId && config.oidc.clientSecret);
+}

@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { config } from "./lib/config";
 import { db, runMigrations } from "./db";
-import { authMiddleware } from "./routes/auth";
+import { authRoutes, oidcMiddleware } from "./routes/auth";
 import { users } from "./db/schema";
 import { eq } from "drizzle-orm";
 import { randomUUID } from "crypto";
@@ -11,6 +11,7 @@ import templatesRoutes from "./routes/templates";
 import shiftsRoutes from "./routes/shifts";
 import icalRoutes from "./routes/ical";
 import userRoutes from "./routes/user";
+import { getAuth } from "@hono/oidc-auth";
 
 import { writeFileSync, mkdirSync } from "fs";
 import { join, extname } from "path";
@@ -44,7 +45,41 @@ if (!config.authEnabled) {
 
 const api = new Hono();
 api.use("*", cors());
-api.use("*", authMiddleware);
+api.route("/api/auth", authRoutes);
+api.use("*", async (c, next) => {
+  if (c.req.path.startsWith("/api/auth")) return next();
+  if (!config.authEnabled) {
+    c.set("user", { id: "dev-user", name: "Dev User", email: "dev@localhost" });
+    return next();
+  }
+
+  return oidcMiddleware(c, next);
+});
+
+api.use("*", async (c, next) => {
+  if (c.req.path.startsWith("/api/auth")) return next();
+  if (!config.authEnabled) {
+    c.set("user", { id: "dev-user", name: "Dev User", email: "dev@localhost" });
+    return next();
+  }
+
+  const auth = await getAuth(c);
+  if (!auth?.sub) return c.json({ error: "unauthorized" }, 401);
+
+  let user = db.select().from(users).where(eq(users.id, auth.sub)).get();
+  if (!user) {
+    db.insert(users).values({
+      id: auth.sub,
+      name: (auth.name as string) || auth.email || "Unknown",
+      email: (auth.email as string) || "",
+      icalToken: randomUUID(),
+    }).run();
+    user = db.select().from(users).where(eq(users.id, auth.sub)).get();
+  }
+  if (!user) return c.json({ error: "unauthorized" }, 401);
+  c.set("user", { id: user.id, name: user.name, email: user.email });
+  await next();
+});
 
 api.onError((err, c) => {
   const msg = `[${new Date().toISOString()}] ${err.message}\n${err.stack}\n`;
