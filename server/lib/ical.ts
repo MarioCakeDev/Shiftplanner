@@ -1,6 +1,7 @@
 import { db } from "../db";
 import { shifts, users } from "../db/schema";
 import { eq } from "drizzle-orm";
+import { parseISO } from "date-fns";
 import { mkdirSync, existsSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 
@@ -16,9 +17,37 @@ export function invalidateIcalCache(userId: string) {
   }
 }
 
+function getTimeZoneOffset(date: Date, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+
+  const values = Object.fromEntries(parts.filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
+  const asUtc = Date.UTC(
+    Number(values.year),
+    Number(values.month) - 1,
+    Number(values.day),
+    Number(values.hour),
+    Number(values.minute),
+    Number(values.second),
+  );
+
+  return (asUtc - date.getTime()) / 60000;
+}
+
 function formatIcalDate(iso: string): string {
-  const padded = iso.length === 16 ? iso + ":00" : iso;
-  return padded.replace(/[-:]/g, "");
+  const padded = iso.length === 16 ? `${iso}:00` : iso;
+  const parsed = parseISO(padded);
+  const offset = getTimeZoneOffset(parsed, TIMEZONE);
+  const utc = new Date(parsed.getTime() - offset * 60_000);
+  return utc.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
 }
 
 function escapeIcalText(text: string): string {
@@ -45,7 +74,6 @@ export function generateIcal(userId: string): string {
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
     `X-WR-CALNAME:Schichtplan ${escapeIcalText(user.name)}`,
-    `X-WR-TIMEZONE:${TIMEZONE}`,
   ];
 
   for (const shift of userShifts) {
@@ -54,8 +82,8 @@ export function generateIcal(userId: string): string {
     lines.push(
       "BEGIN:VEVENT",
       `UID:${shift.id}@schichtplan`,
-      `DTSTART;TZID=${TIMEZONE}:${start}`,
-      `DTEND;TZID=${TIMEZONE}:${end}`,
+      `DTSTART:${start}`,
+      `DTEND:${end}`,
       `SUMMARY:${escapeIcalText(shift.title)}`,
       `DESCRIPTION:${escapeIcalText(shift.title)}`,
       `DTSTAMP:${now}`,
