@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "outDir": "dist",
+    "rootDir": ".",
+    "paths": {
+      "@/*": ["./client/src/*"]
+    }
+  },
+  "include": ["server/**/*.ts", "client/src/**/*.ts", "client/src/**/*.tsx"],
+  "exclude": ["node_modules", "dist", "client/dist"]
+}

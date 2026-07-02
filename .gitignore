@@ -1,0 +1,9 @@
+node_modules/
+dist/
+client/dist/
+drizzle/
+data/
+.playwright-mcp/
+*.db
+*.db-wal
+*.db-shm
