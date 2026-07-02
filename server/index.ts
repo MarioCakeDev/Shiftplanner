@@ -46,15 +46,7 @@ if (!config.authEnabled) {
 const api = new Hono();
 api.use("*", cors());
 api.route("/api/auth", authRoutes);
-api.use("*", async (c, next) => {
-  if (c.req.path.startsWith("/api/auth")) return next();
-  if (!config.authEnabled) {
-    c.set("user", { id: "dev-user", name: "Dev User", email: "dev@localhost" });
-    return next();
-  }
-
-  return oidcMiddleware(c, next);
-});
+api.use("*", oidcMiddleware);
 
 api.use("*", async (c, next) => {
   if (c.req.path.startsWith("/api/auth")) return next();

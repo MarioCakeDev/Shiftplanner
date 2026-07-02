@@ -31,7 +31,7 @@ export const oidcAuthConfig = {
 };
 
 export const authRoutes = new Hono()
-  .get("/login", (c) => c.redirect("/api/auth/callback"))
+  .get("/login", (c) => c.redirect("/"))
   .get("/callback", async (c) => processOAuthCallback(c))
   .get("/logout", async (c) => {
     await revokeSession(c);
