@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Calendar } from "./components/Calendar";
 import { Toolbar } from "./components/Toolbar";
 import { ShiftSelectorPopup } from "./components/ShiftSelectorPopup";
+import { ProfileDropdown } from "./components/ProfileDropdown";
 import { useTemplates } from "./hooks/useTemplates";
 import { useShifts } from "./hooks/useShifts";
 import { api } from "./lib/api";
@@ -9,6 +10,8 @@ import type { UserInfo } from "./lib/api";
 
 export default function App() {
   const [user, setUser] = useState<UserInfo | null>(null);
+  const [userLoading, setUserLoading] = useState(true);
+  const [copied, setCopied] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -20,7 +23,7 @@ export default function App() {
   const { shifts, batch, reload, remove: removeShift, update: updateShift } = useShifts(currentMonth);
 
   useEffect(() => {
-    api.user.me().then(setUser).catch(console.error);
+    api.user.me().then(setUser).catch(() => setUser(null)).finally(() => setUserLoading(false));
   }, []);
 
   const handleSelectShift = useCallback((dates: string[]) => {
@@ -42,6 +45,30 @@ export default function App() {
     setSelectorDates(null);
   }, []);
 
+  const icalUrl = user?.icalUrl
+    ? (user.icalUrl.endsWith(".ics") ? user.icalUrl : `${user.icalUrl}.ics`)
+    : null;
+
+  const handleCopyIcal = useCallback(() => {
+    if (!icalUrl) return;
+    navigator.clipboard.writeText(icalUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, [icalUrl]);
+
+  const handleDownloadIcal = useCallback(async () => {
+    if (!icalUrl) return;
+    const response = await fetch(icalUrl);
+    const blob = await response.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "schichtplan.ics";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+  }, [icalUrl]);
+
   const handleTemplateUpdated = useCallback(async (id: string, data: { title: string; startTime: string; endTime: string; color: string }) => {
     const updated = await updateTemplate(id, data);
     await reload();
@@ -57,29 +84,17 @@ export default function App() {
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
         <h1 className="text-lg font-semibold text-gray-900">Schichtplan</h1>
-        {user && (
-          <div className="text-sm text-gray-500">
-            {user.name}
-            <button
-              onClick={() => navigator.clipboard.writeText(user.icalUrl.endsWith(".ics") ? user.icalUrl : `${user.icalUrl}.ics`)}
-              className="ml-3 text-blue-600 hover:text-blue-800 underline cursor-pointer"
-            >
-              Copy iCal URL
-            </button>
+        <div className="flex items-center gap-3">
+          {!userLoading && !user && (
             <button
               onClick={() => (window.location.href = "/api/auth/login")}
-              className="ml-3 text-blue-600 hover:text-blue-800 underline cursor-pointer"
+              className="text-sm text-blue-600 hover:text-blue-800 underline cursor-pointer"
             >
               Login
             </button>
-            <button
-              onClick={() => (window.location.href = "/api/auth/logout")}
-              className="ml-3 text-blue-600 hover:text-blue-800 underline cursor-pointer"
-            >
-              Logout
-            </button>
-          </div>
-        )}
+          )}
+          {user && <ProfileDropdown user={user} />}
+        </div>
       </header>
 
       <Toolbar
@@ -103,6 +118,22 @@ export default function App() {
           onUpdateShift={updateShift}
           onSelectShift={handleSelectShift}
         />
+        {icalUrl && (
+          <div className="mt-4 flex gap-2 justify-center">
+            <button
+              onClick={handleCopyIcal}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 cursor-pointer"
+            >
+              {copied ? "Copied!" : "Copy iCal URL"}
+            </button>
+            <button
+              onClick={handleDownloadIcal}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 cursor-pointer"
+            >
+              Download
+            </button>
+          </div>
+        )}
       </div>
 
       {selectorDates && (

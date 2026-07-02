@@ -36,7 +36,9 @@ export type UserInfo = {
   id: string;
   name: string;
   email: string;
+  picture?: string;
   icalUrl: string;
+  authEnabled: boolean;
 };
 
 export type CreateTemplateInput = {

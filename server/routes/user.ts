@@ -18,6 +18,7 @@ const app = new Hono<{ Variables: { user: AuthUser } }>()
     return c.json({
       id: dbUser.id, name: dbUser.name, email: dbUser.email,
       icalUrl: `${baseUrl}/api/ical/${dbUser.icalToken}.ics`,
+      authEnabled: config.authEnabled,
     } satisfies UserInfo);
   })
   .post("/regenerate-ical-token", (c) => {

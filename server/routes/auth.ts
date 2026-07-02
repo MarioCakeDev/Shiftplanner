@@ -47,6 +47,7 @@ app.get("/me", async (c) => {
     id: auth.sub || "",
     name: (auth.name as string) || "Unknown",
     email: (auth.email as string) || "",
+    picture: (auth.picture as string) || undefined,
     icalUrl: "",
   });
 });
