@@ -56,7 +56,7 @@ api.use("*", async (c, next) => {
   }
 
   const auth = await getAuth(c);
-  if (!auth?.sub) return c.json({ error: "unauthorized" }, 401);
+  if (!auth?.sub) return c.redirect("/api/auth/login");
 
   let user = db.select().from(users).where(eq(users.id, auth.sub)).get();
   if (!user) {
@@ -68,7 +68,7 @@ api.use("*", async (c, next) => {
     }).run();
     user = db.select().from(users).where(eq(users.id, auth.sub)).get();
   }
-  if (!user) return c.json({ error: "unauthorized" }, 401);
+  if (!user) return c.redirect("/api/auth/login");
   c.set("user", { id: user.id, name: user.name, email: user.email });
   await next();
 });
