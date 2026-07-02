@@ -49,6 +49,7 @@ api.route("/api/auth", authRoutes);
 
 api.use("*", async (c, next) => {
   if (c.req.path.startsWith("/api/auth")) return next();
+  if (c.req.path.startsWith("/api/ical")) return next();
   if (!config.authEnabled) {
     c.set("user", { id: "dev-user", name: "Dev User", email: "dev@localhost" });
     return next();
