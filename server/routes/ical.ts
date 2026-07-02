@@ -6,8 +6,8 @@ import { generateIcal } from "../lib/ical";
 import type { ErrorResponse } from "../../shared/types";
 
 const app = new Hono()
-  .get("/:token", (c) => {
-    const token = c.req.param("token");
+  .get(":token", (c) => {
+    const token = c.req.param("token").replace(/\.ics$/i, "");
     const user = db.select().from(users).where(eq(users.icalToken, token)).get();
     if (!user) return c.json({ error: "invalid token" } satisfies ErrorResponse, 404);
 

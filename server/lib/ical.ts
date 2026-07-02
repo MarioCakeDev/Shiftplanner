@@ -14,8 +14,6 @@ export function invalidateIcalCache(userId: string) {
   }
 }
 
-const TIMEZONE = process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone;
-
 function formatIcalDate(iso: string): string {
   const padded = iso.length === 16 ? iso + ":00" : iso;
   return padded.replace(/[-:]/g, "");
@@ -45,7 +43,6 @@ export function generateIcal(userId: string): string {
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
     `X-WR-CALNAME:Schichtplan ${escapeIcalText(user.name)}`,
-    `X-WR-TIMEZONE:${TIMEZONE}`,
   ];
 
   for (const shift of userShifts) {
@@ -54,8 +51,8 @@ export function generateIcal(userId: string): string {
     lines.push(
       "BEGIN:VEVENT",
       `UID:${shift.id}@schichtplan`,
-      `DTSTART;TZID=${TIMEZONE}:${start}`,
-      `DTEND;TZID=${TIMEZONE}:${end}`,
+      `DTSTART:${start}`,
+      `DTEND:${end}`,
       `SUMMARY:${escapeIcalText(shift.title)}`,
       `DESCRIPTION:${escapeIcalText(shift.title)}`,
       `DTSTAMP:${now}`,

@@ -61,7 +61,7 @@ export default function App() {
           <div className="text-sm text-gray-500">
             {user.name}
             <button
-              onClick={() => navigator.clipboard.writeText(user.icalUrl)}
+              onClick={() => navigator.clipboard.writeText(user.icalUrl.endsWith(".ics") ? user.icalUrl : `${user.icalUrl}.ics`)}
               className="ml-3 text-blue-600 hover:text-blue-800 underline cursor-pointer"
             >
               Copy iCal URL

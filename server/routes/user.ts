@@ -17,7 +17,7 @@ const app = new Hono<{ Variables: { user: AuthUser } }>()
       : new URL(c.req.url).origin;
     return c.json({
       id: dbUser.id, name: dbUser.name, email: dbUser.email,
-      icalUrl: `${baseUrl}/api/ical/${dbUser.icalToken}`,
+      icalUrl: `${baseUrl}/api/ical/${dbUser.icalToken}.ics`,
     } satisfies UserInfo);
   })
   .post("/regenerate-ical-token", (c) => {
@@ -27,7 +27,7 @@ const app = new Hono<{ Variables: { user: AuthUser } }>()
     const baseUrl = config.oidc.redirectUri.startsWith("http")
       ? new URL(config.oidc.redirectUri).origin
       : new URL(c.req.url).origin;
-    return c.json({ icalUrl: `${baseUrl}/api/ical/${newToken}` });
+    return c.json({ icalUrl: `${baseUrl}/api/ical/${newToken}.ics` });
   });
 
 export type UserAppType = typeof app;
