@@ -1,7 +1,6 @@
 import { db } from "../db";
 import { shifts, users } from "../db/schema";
 import { eq } from "drizzle-orm";
-import { parseISO } from "date-fns";
 import { mkdirSync, existsSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 
@@ -42,11 +41,25 @@ function getTimeZoneOffset(date: Date, timeZone: string): number {
   return (asUtc - date.getTime()) / 60000;
 }
 
+function parseWallTime(iso: string) {
+  const match = iso.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/);
+  if (!match) throw new Error(`Invalid date time: ${iso}`);
+  return {
+    year: Number(match[1]),
+    month: Number(match[2]),
+    day: Number(match[3]),
+    hour: Number(match[4]),
+    minute: Number(match[5]),
+    second: Number(match[6] || "0"),
+  };
+}
+
 function formatIcalDate(iso: string): string {
   const padded = iso.length === 16 ? `${iso}:00` : iso;
-  const parsed = parseISO(padded);
-  const offset = getTimeZoneOffset(parsed, TIMEZONE);
-  const utc = new Date(parsed.getTime() - offset * 60_000);
+  const { year, month, day, hour, minute, second } = parseWallTime(padded.replace(/Z$/i, ""));
+  const wallTime = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+  const offset = getTimeZoneOffset(wallTime, TIMEZONE);
+  const utc = new Date(wallTime.getTime() - offset * 60_000);
   return utc.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
 }
 
