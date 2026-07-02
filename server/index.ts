@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { config } from "./lib/config";
 import { db, runMigrations } from "./db";
-import { authRoutes, oidcMiddleware } from "./routes/auth";
+import { authRoutes } from "./routes/auth";
 import { users } from "./db/schema";
 import { eq } from "drizzle-orm";
 import { randomUUID } from "crypto";

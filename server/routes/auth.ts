@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { initOidcAuthMiddleware, processOAuthCallback, revokeSession, getAuth } from "@hono/oidc-auth";
+import { initOidcAuthMiddleware, oidcAuthMiddleware, processOAuthCallback, revokeSession, getAuth } from "@hono/oidc-auth";
 import { config } from "../lib/config";
 
 export type AuthUser = {
@@ -14,7 +14,7 @@ declare module "hono" {
   }
 }
 
-export const oidcMiddleware = initOidcAuthMiddleware({
+const oidcConfigMiddleware = initOidcAuthMiddleware({
   OIDC_AUTH_SECRET: process.env.OIDC_AUTH_SECRET || "dev-secret-change-this-in-production-dev-secret-change-this-in-production",
   OIDC_ISSUER: config.oidc.issuer,
   OIDC_CLIENT_ID: config.oidc.clientId,
@@ -32,7 +32,8 @@ export const oidcMiddleware = initOidcAuthMiddleware({
 
 const app = new Hono();
 
-app.use("/login", oidcMiddleware);
+app.use("/login", oidcConfigMiddleware);
+app.use("/login", oidcAuthMiddleware());
 app.get("/login", (c) => c.redirect("/"));
 app.get("/callback", async (c) => processOAuthCallback(c));
 app.get("/logout", async (c) => {
