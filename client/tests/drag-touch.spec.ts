@@ -162,6 +162,107 @@ test.describe("Drag and Drop", () => {
   });
 });
 
+test.describe("Undo / Redo", () => {
+  test.beforeEach(async ({ page }) => {
+    await cleanup(page);
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+  });
+
+  test("undo reverts a shift and redo reapplies it", async ({ page }) => {
+    await createTemplate(page, "UndoTest");
+    await armTemplate(page, "UndoTest");
+
+    const batchResponse = page.waitForResponse(
+      (res) => res.url().includes("/api/shifts/batch") && res.status() === 200,
+    );
+    await cell(page, 5).click();
+    const batchBody = await (await batchResponse).json();
+    expect(batchBody.created).toBe(1);
+
+    await expect(page.getByText(/^↶ Undo/)).toBeVisible();
+
+    const undoResponse = page.waitForResponse(
+      (res) => res.url().includes("/api/shifts/batch") && res.status() === 200,
+    );
+    await page.getByText(/^↶ Undo/).click();
+    await undoResponse;
+
+    await expect(page.getByText(/^↷ Redo/)).toBeVisible();
+
+    const redoResponse = page.waitForResponse(
+      (res) => res.url().includes("/api/shifts/batch") && res.status() === 200,
+    );
+    await page.getByText(/^↷ Redo/).click();
+    await redoResponse;
+  });
+
+  test("undo after drag across pre-existing shift only reverts new dates", async ({ page }) => {
+    await createTemplate(page, "PreExist");
+    await armTemplate(page, "PreExist");
+
+    const firstBatch = page.waitForResponse(
+      (res) => res.url().includes("/api/shifts/batch") && res.status() === 200,
+    );
+    await cell(page, 8).click();
+    const firstBody = await (await firstBatch).json();
+    expect(firstBody.created).toBe(1);
+
+    const cells = page.locator("[data-date]");
+    const box7 = await cell(page, 7).boundingBox();
+    const box9 = await cell(page, 9).boundingBox();
+    expect(box7).toBeTruthy();
+    expect(box9).toBeTruthy();
+
+    const dragBatch = page.waitForResponse(
+      (res) => res.url().includes("/api/shifts/batch") && res.status() === 200,
+    );
+    await page.mouse.move(box7!.x + box7!.width / 2, box7!.y + box7!.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box9!.x + box9!.width / 2, box9!.y + box9!.height / 2, { steps: 10 });
+    await page.mouse.up();
+    const dragBody = await (await dragBatch).json();
+    expect(dragBody.created + dragBody.replaced).toBeGreaterThanOrEqual(2);
+
+    const undoResponse = page.waitForResponse(
+      (res) => res.url().includes("/api/shifts/batch") && res.status() === 200,
+    );
+    await page.getByText(/^↶ Undo/).click();
+    const undoBody = await (await undoResponse).json();
+    expect(undoBody.deleted).toBe(2);
+
+    const shiftsAfter = await page.request.get("/api/shifts").then(r => r.json());
+    expect(Array.isArray(shiftsAfter)).toBe(true);
+    expect(shiftsAfter.length).toBe(1);
+  });
+
+  test("new batch clears redo stack", async ({ page }) => {
+    await createTemplate(page, "RedoClear");
+    await armTemplate(page, "RedoClear");
+
+    const batch1 = page.waitForResponse(
+      (res) => res.url().includes("/api/shifts/batch") && res.status() === 200,
+    );
+    await cell(page, 5).click();
+    await batch1;
+
+    await page.getByText(/^↶ Undo/).click();
+    await page.waitForResponse(
+      (res) => res.url().includes("/api/shifts/batch") && res.status() === 200,
+    );
+
+    await expect(page.getByText(/^↷ Redo/)).toBeVisible();
+
+    const batch2 = page.waitForResponse(
+      (res) => res.url().includes("/api/shifts/batch") && res.status() === 200,
+    );
+    await cell(page, 10).click();
+    await batch2;
+
+    await expect(page.getByText(/^↷ Redo/)).toBeDisabled();
+  });
+});
+
 test.describe("Touch Events", () => {
   test.beforeEach(async ({ page }) => {
     await cleanup(page);
