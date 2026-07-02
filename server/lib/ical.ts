@@ -1,6 +1,7 @@
 import { db } from "../db";
 import { shifts, users } from "../db/schema";
 import { eq } from "drizzle-orm";
+import { fromZonedTime } from "date-fns-tz";
 import { mkdirSync, existsSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 
@@ -16,51 +17,9 @@ export function invalidateIcalCache(userId: string) {
   }
 }
 
-function getTimeZoneOffset(date: Date, timeZone: string): number {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  }).formatToParts(date);
-
-  const values = Object.fromEntries(parts.filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
-  const asUtc = Date.UTC(
-    Number(values.year),
-    Number(values.month) - 1,
-    Number(values.day),
-    Number(values.hour),
-    Number(values.minute),
-    Number(values.second),
-  );
-
-  return (asUtc - date.getTime()) / 60000;
-}
-
-function parseWallTime(iso: string) {
-  const match = iso.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/);
-  if (!match) throw new Error(`Invalid date time: ${iso}`);
-  return {
-    year: Number(match[1]),
-    month: Number(match[2]),
-    day: Number(match[3]),
-    hour: Number(match[4]),
-    minute: Number(match[5]),
-    second: Number(match[6] || "0"),
-  };
-}
-
 function formatIcalDate(iso: string): string {
   const padded = iso.length === 16 ? `${iso}:00` : iso;
-  const { year, month, day, hour, minute, second } = parseWallTime(padded.replace(/Z$/i, ""));
-  const wallTime = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
-  const offset = getTimeZoneOffset(wallTime, TIMEZONE);
-  const utc = new Date(wallTime.getTime() - offset * 60_000);
-  return utc.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+  return fromZonedTime(padded.replace(/Z$/i, ""), TIMEZONE).toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
 }
 
 function escapeIcalText(text: string): string {
