@@ -19,7 +19,7 @@ const oidcConfigMiddleware = initOidcAuthMiddleware({
   OIDC_ISSUER: config.oidc.issuer,
   OIDC_CLIENT_ID: config.oidc.clientId,
   OIDC_CLIENT_SECRET: config.oidc.clientSecret,
-  OIDC_REDIRECT_URI: "/api/auth/callback",
+  OIDC_REDIRECT_URI: config.oidc.redirectUri,
   OIDC_AUTH_EXTERNAL_URL: process.env.OIDC_AUTH_EXTERNAL_URL,
   OIDC_COOKIE_DOMAIN: process.env.OIDC_COOKIE_DOMAIN,
   OIDC_COOKIE_PATH: "/",
